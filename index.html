@@ -8,7 +8,7 @@
 <title>LensBridge</title>
 <link rel="icon" href="data:,">
 <style>
-  /* LensBridge 0.4.1 (glasses-69): outlined bubble; slide retired; up/down switch plate
+  /* LensBridge 0.4.3 (glasses-71): revised inner glow + blue colour alternate; English 32 px
      rendered by the glasses' own browser. Nothing here is a simulation: what this draws is what
      the waveguide emits. Black is transparent. */
   @font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;font-display:block;
@@ -41,15 +41,21 @@
          transition:box-shadow 600ms ease-out, opacity 300ms linear;}
   body[data-plate="vfade"] #plate{
          background:linear-gradient(to bottom, rgba(255,255,255,.90) 0%, rgba(255,255,255,.35) 100%);}
-  /* Chad's outlined bubble (glasses-69): 50 % fill, a black INNER glow -- which on an additive
-     display means the interior dims toward transparent at its edges -- and a 90 % 3 px stroke that
-     keeps the shape crisp while the fill emits half the light. */
-  body[data-plate="outline"] #plate{
-         background:rgba(255,255,255,.50);
-         border:3px solid rgba(255,255,255,.90);
-         box-shadow:inset 0 0 18px 4px rgba(0,0,0,1);}
+  /* Chad's revised inner-glow bubble (glasses-71): 40 % fill, inner glow eased to 75 %, no stroke,
+     English at 80 % white. */
+  body[data-plate="inner"] #plate{
+         background:rgba(255,255,255,.40);
+         box-shadow:inset 0 0 18px 4px rgba(255,255,255,.75);}
+  body[data-plate="inner"] #en{color:rgba(255,255,255,.80);}
+  /* Chad's colour alternate (glasses-71): pale blue-white text on a blue fill that darkens toward
+     its edges under a navy inner glow. First non-white light on the lens. Luminance for the record:
+     text ~214, fill ~89, glow ~30 of 255 -- the fill emits about as much light as the 40 % white one. */
+  body[data-plate="blue"] #plate{
+         background:rgb(30,95,200);
+         box-shadow:inset 0 0 18px 4px rgb(10,30,75);}
+  body[data-plate="blue"] #en{color:rgb(204,215,230);}
   body[data-plate="solid"] #plate{background:#fff;}
-  #en{font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;font-size:36px;
+  #en{font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;font-size:32px;
       line-height:1.22;color:#000;letter-spacing:-.012em;}
 
   /* ---- Effects showcase (glasses-68). Each carries information a live caption needs. ---- */
@@ -57,8 +63,10 @@
   #en .w.on{opacity:1;}
   #block.provisional #plate{opacity:.55;}
   #en .doubt{opacity:.55;text-decoration:underline dotted;text-underline-offset:5px;text-decoration-thickness:2px;}
+  body[data-plate="inner"] #en .doubt, body[data-plate="blue"] #en .doubt{opacity:.6;}
   #block.arrive #plate{box-shadow:0 0 26px 8px rgba(255,255,255,.42);}
-  body[data-plate="outline"] #block.arrive #plate{box-shadow:inset 0 0 18px 4px rgba(0,0,0,1), 0 0 26px 8px rgba(255,255,255,.42);}
+  body[data-plate="inner"] #block.arrive #plate{box-shadow:inset 0 0 18px 4px rgba(255,255,255,.75), 0 0 26px 8px rgba(255,255,255,.42);}
+  body[data-plate="blue"]  #block.arrive #plate{box-shadow:inset 0 0 18px 4px rgb(10,30,75), 0 0 26px 8px rgba(120,170,255,.45);}
   #block.aging{transition:opacity 6000ms linear;}
   #block.aged{opacity:.38;}
 
@@ -76,7 +84,7 @@
 </style>
 </head>
 <body>
-  <div id="tag">LensBridge 0.4.1</div>
+  <div id="tag">LensBridge 0.4.3</div>
   <div id="hud"></div>
   <div id="stage" class="focusable" tabindex="0" role="application" aria-label="LensBridge">
     <div id="block">
@@ -102,7 +110,7 @@
     {id:"age",       note:"dims over 6 s of silence, then clears"}
   ];
   var i = 1, kaBright = 75, busy = false, fx = 0, ageTimer = null, clearTimer = null;
-  var PLATES = ["outline","vfade","solid"], plateIdx = 0;
+  var PLATES = ["inner","blue","vfade","solid"], plateIdx = 0;
   function setPlate(n){ plateIdx = (n + PLATES.length) % PLATES.length;
                         document.body.dataset.plate = PLATES[plateIdx]; flash("plate: " + PLATES[plateIdx]); }
   var block = document.getElementById("block"), en = document.getElementById("en"),
