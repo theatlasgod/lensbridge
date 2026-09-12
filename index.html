@@ -8,7 +8,7 @@
 <title>LensBridge</title>
 <link rel="icon" href="data:,">
 <style>
-  /* LensBridge 0.2 (glasses-64): fade 500 ms, pinch cycles plate treatments. The frozen design from LENS_DESIGN_FROZEN.md,
+  /* LensBridge 0.3 (glasses-65): vertical plate fade 80->55 %, focus hairline removed. The frozen design from LENS_DESIGN_FROZEN.md,
      rendered by the glasses' own browser. Nothing here is a simulation: what this draws is what
      the waveguide emits. Black is transparent. */
   @font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;font-display:block;
@@ -27,9 +27,9 @@
   /* The single focusable element. It is always focused, so the required indicator is a faint
      hairline along the bottom edge rather than the docs' cyan glow, which would sit on top of the
      design under test. */
+  /* No visible focus indicator. There is one focusable element and it is always focused; the
+     hairline that used to sit here showed up on the real lens as a stray 1 px line (glasses-65). */
   #stage:focus{outline:none;}
-  #stage:focus::after{content:"";position:absolute;left:0;right:0;bottom:-8px;height:1px;
-                      background:rgba(255,255,255,.28);}
 
   #block{display:flex;flex-direction:column;align-items:flex-start;gap:12px;
          transition:opacity 500ms linear;opacity:1;}
@@ -39,6 +39,8 @@
   #plate{background:#fff;border-radius:15px;padding:13px 17px;max-width:100%;}
   /* Plate probes, cycled with a pinch. Black text needs a lit background under every glyph, so a
      gradient may only soften the MARGINS; it must stay bright beneath the text itself. */
+  body[data-plate="vfade"] #plate{
+    background:linear-gradient(to bottom, rgba(255,255,255,.80) 0%, rgba(255,255,255,.55) 100%);}
   body[data-plate="feather"] #plate{
     -webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);
             mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
@@ -64,7 +66,7 @@
 </style>
 </head>
 <body>
-  <div id="tag">LensBridge 0.2</div>
+  <div id="tag">LensBridge 0.3</div>
   <div id="hud"></div>
   <div id="stage" class="focusable" tabindex="0" role="application" aria-label="LensBridge">
     <div id="block">
@@ -82,7 +84,7 @@
                                                                                   k:"ხვალ დილით ცხრა საათზე შევხვდებით სასტუმროსთან, თუ ეს თქვენთვის მოსახერხებელია."}
   ];
   var i = 1, kaBright = 75, busy = false;
-  var PLATES = ["solid","feather","dim","glow","none"], plateIdx = 0;
+  var PLATES = ["vfade","solid","feather","dim","glow","none"], plateIdx = 0;
   function setPlate(n){ plateIdx = (n + PLATES.length) % PLATES.length;
                         document.body.dataset.plate = PLATES[plateIdx]; }
   var block = document.getElementById("block"), en = document.getElementById("en"),
@@ -121,6 +123,7 @@
     }
     e.preventDefault();
   });
+  setPlate(0);
   paint();
   stage.focus();
 </script>
