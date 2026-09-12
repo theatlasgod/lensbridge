@@ -8,7 +8,7 @@
 <title>LensBridge</title>
 <link rel="icon" href="data:,">
 <style>
-  /* LensBridge first-light build (glasses-62). The frozen design from LENS_DESIGN_FROZEN.md,
+  /* LensBridge 0.2 (glasses-64): fade 500 ms, pinch cycles plate treatments. The frozen design from LENS_DESIGN_FROZEN.md,
      rendered by the glasses' own browser. Nothing here is a simulation: what this draws is what
      the waveguide emits. Black is transparent. */
   @font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;font-display:block;
@@ -32,11 +32,21 @@
                       background:rgba(255,255,255,.28);}
 
   #block{display:flex;flex-direction:column;align-items:flex-start;gap:12px;
-         transition:opacity 250ms linear;opacity:1;}
+         transition:opacity 500ms linear;opacity:1;}
   #block.out{opacity:0;}
 
   /* The plate wraps the English ONLY. Radius 15, padding 17/13, hugs its longest line. */
   #plate{background:#fff;border-radius:15px;padding:13px 17px;max-width:100%;}
+  /* Plate probes, cycled with a pinch. Black text needs a lit background under every glyph, so a
+     gradient may only soften the MARGINS; it must stay bright beneath the text itself. */
+  body[data-plate="feather"] #plate{
+    -webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);
+            mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
+  body[data-plate="dim"] #plate{background:rgba(255,255,255,.7);}
+  body[data-plate="glow"] #plate{background:rgba(255,255,255,.82);
+    box-shadow:0 0 28px 6px rgba(255,255,255,.28);}
+  body[data-plate="none"] #plate{background:transparent;padding:0;}
+  body[data-plate="none"] #en{color:#fff;}
   #en{font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;font-size:36px;
       line-height:1.22;color:#000;letter-spacing:-.012em;}
 
@@ -54,7 +64,7 @@
 </style>
 </head>
 <body>
-  <div id="tag">LensBridge 0.1</div>
+  <div id="tag">LensBridge 0.2</div>
   <div id="hud"></div>
   <div id="stage" class="focusable" tabindex="0" role="application" aria-label="LensBridge">
     <div id="block">
@@ -72,6 +82,9 @@
                                                                                   k:"ხვალ დილით ცხრა საათზე შევხვდებით სასტუმროსთან, თუ ეს თქვენთვის მოსახერხებელია."}
   ];
   var i = 1, kaBright = 75, busy = false;
+  var PLATES = ["solid","feather","dim","glow","none"], plateIdx = 0;
+  function setPlate(n){ plateIdx = (n + PLATES.length) % PLATES.length;
+                        document.body.dataset.plate = PLATES[plateIdx]; }
   var block = document.getElementById("block"), en = document.getElementById("en"),
       ka = document.getElementById("ka"), stage = document.getElementById("stage"),
       hud = document.getElementById("hud");
@@ -87,7 +100,7 @@
     if (busy) return; busy = true;
     block.classList.add("out");
     setTimeout(function(){ i = (next + UTTS.length) % UTTS.length; paint();
-                           block.classList.remove("out"); busy = false; }, 250);
+                           block.classList.remove("out"); busy = false; }, 500);
   }
   var hudTimer = null;
   function flash(msg){
@@ -99,7 +112,8 @@
   //   Up / Down    -> Georgian brightness +/- 5 %, a first-light readability probe
   document.addEventListener("keydown", function(e){
     switch (e.key) {
-      case "ArrowRight": case "Enter": show(i + 1); break;
+      case "ArrowRight": show(i + 1); break;
+      case "Enter":      setPlate(plateIdx + 1); flash("plate: " + PLATES[plateIdx]); break;
       case "ArrowLeft":                show(i - 1); break;
       case "ArrowUp":   kaBright = Math.min(100, kaBright + 5); paint(); flash("Georgian " + kaBright + "%"); break;
       case "ArrowDown": kaBright = Math.max(20,  kaBright - 5); paint(); flash("Georgian " + kaBright + "%"); break;
