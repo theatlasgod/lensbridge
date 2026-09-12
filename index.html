@@ -8,7 +8,7 @@
 <title>LensBridge</title>
 <link rel="icon" href="data:,">
 <style>
-  /* LensBridge 0.3.1 (glasses-66): vfade 90->35 %, grey-ramp test card on pinch. The frozen design from LENS_DESIGN_FROZEN.md,
+  /* LensBridge 0.4.0 (glasses-68): effects showcase; plate fixed at vfade 90->35 %
      rendered by the glasses' own browser. Nothing here is a simulation: what this draws is what
      the waveguide emits. Black is transparent. */
   @font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;font-display:block;
@@ -31,31 +31,27 @@
      hairline that used to sit here showed up on the real lens as a stray 1 px line (glasses-65). */
   #stage:focus{outline:none;}
 
-  #block{display:flex;flex-direction:column;align-items:flex-start;gap:12px;
-         transition:opacity 500ms linear;opacity:1;}
+  #block{display:flex;flex-direction:column;align-items:flex-start;gap:12px;opacity:1;
+         transform:translateY(0);transition:opacity 500ms linear, transform 500ms cubic-bezier(.2,.7,.2,1);}
   #block.out{opacity:0;}
 
-  /* The plate wraps the English ONLY. Radius 15, padding 17/13, hugs its longest line. */
-  #plate{background:#fff;border-radius:15px;padding:13px 17px;max-width:100%;}
-  /* Plate probes, cycled with a pinch. Black text needs a lit background under every glyph, so a
-     gradient may only soften the MARGINS; it must stay bright beneath the text itself. */
-  body[data-plate="vfade"] #plate{
-    background:linear-gradient(to bottom, rgba(255,255,255,.90) 0%, rgba(255,255,255,.35) 100%);}
-  body[data-plate="feather"] #plate{
-    -webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);
-            mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
-  body[data-plate="dim"] #plate{background:rgba(255,255,255,.7);}
-  body[data-plate="glow"] #plate{background:rgba(255,255,255,.82);
-    box-shadow:0 0 28px 6px rgba(255,255,255,.28);}
-  body[data-plate="none"] #plate{background:transparent;padding:0;}
-  #ramp{display:none;flex-direction:column;width:100%;border-radius:15px;overflow:hidden;}
-  #ramp div{height:28px;display:flex;align-items:center;padding-left:14px;
-            font:700 18px "Source Sans 3",system-ui,sans-serif;color:#000;}
-  body[data-plate="ramp"] #block{display:none;}
-  body[data-plate="ramp"] #ramp{display:flex;}
-  body[data-plate="none"] #en{color:#fff;}
+  /* The plate wraps the English ONLY. Radius 15, padding 17/13, hugs its longest line.
+     Treatment fixed at Chad's vertical fade, 90 % at the top to 35 % at the bottom (glasses-68). */
+  #plate{border-radius:15px;padding:13px 17px;max-width:100%;
+         background:linear-gradient(to bottom, rgba(255,255,255,.90) 0%, rgba(255,255,255,.35) 100%);
+         transition:box-shadow 600ms ease-out, opacity 300ms linear;}
   #en{font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;font-size:36px;
       line-height:1.22;color:#000;letter-spacing:-.012em;}
+
+  /* ---- Effects showcase (glasses-68). Each carries information a live caption needs. ---- */
+  #block.out.slide{transform:translateY(22px);}
+  #en .w{opacity:0;transition:opacity 180ms linear;}
+  #en .w.on{opacity:1;}
+  #block.provisional #plate{opacity:.55;}
+  #en .doubt{opacity:.55;text-decoration:underline dotted;text-underline-offset:5px;text-decoration-thickness:2px;}
+  #block.arrive #plate{box-shadow:0 0 26px 8px rgba(255,255,255,.42);}
+  #block.aging{transition:opacity 6000ms linear;}
+  #block.aged{opacity:.38;}
 
   /* Georgian OUTSIDE the plate, on bare glass, at a share of full white. */
   #ka{font-family:"Noto Sans Georgian",Sylfaen,serif;font-weight:400;font-size:22px;
@@ -64,33 +60,22 @@
   /* Build tag: confirms the right build loaded during first light. 16 px is Meta's stated minimum. */
   #tag{position:absolute;right:36px;top:36px;font-size:16px;color:rgba(255,255,255,.35);
        font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;letter-spacing:.04em;}
-  #hud{position:absolute;left:36px;top:36px;font-size:16px;color:rgba(255,255,255,.55);
+  #hud{position:absolute;left:36px;top:36px;right:210px;font-size:16px;color:rgba(255,255,255,.55);
        font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;opacity:0;
        transition:opacity 200ms linear;}
   #hud.show{opacity:1;}
 </style>
 </head>
 <body>
-  <div id="tag">LensBridge 0.3.1</div>
+  <div id="tag">LensBridge 0.4.0</div>
   <div id="hud"></div>
   <div id="stage" class="focusable" tabindex="0" role="application" aria-label="LensBridge">
-    <div id="ramp">
-      <div style="background:rgba(255,255,255,1.00)">100 %</div>
-      <div style="background:rgba(255,255,255,.90)">90 %</div>
-      <div style="background:rgba(255,255,255,.80)">80 %</div>
-      <div style="background:rgba(255,255,255,.70)">70 %</div>
-      <div style="background:rgba(255,255,255,.60)">60 %</div>
-      <div style="background:rgba(255,255,255,.50)">50 %</div>
-      <div style="background:rgba(255,255,255,.40)">40 %</div>
-      <div style="background:rgba(255,255,255,.30)">30 %</div>
-    </div>
     <div id="block">
       <div id="plate"><div id="en"></div></div>
       <div id="ka"></div>
     </div>
   </div>
 <script>
-  // Real conversational lines, the same four the bench measured, so first light is comparable.
   var UTTS = [
     {e:"Hello, how are you?",                                                     k:"გამარჯობა, როგორ ხართ?"},
     {e:"Could you repeat that, please?",                                          k:"შეგიძლიათ გაიმეოროთ, თუ შეიძლება?"},
@@ -98,47 +83,80 @@
     {e:"We'll meet tomorrow morning at nine o'clock near the hotel, if that works for you.",
                                                                                   k:"ხვალ დილით ცხრა საათზე შევხვდებით სასტუმროსთან, თუ ეს თქვენთვის მოსახერხებელია."}
   ];
-  var i = 1, kaBright = 75, busy = false;
-  var PLATES = ["vfade","solid","feather","dim","glow","none","ramp"], plateIdx = 0;
-  function setPlate(n){ plateIdx = (n + PLATES.length) % PLATES.length;
-                        document.body.dataset.plate = PLATES[plateIdx]; }
+  // Pinch cycles these. Every one answers a real caption question, not a cosmetic one.
+  var EFFECTS = [
+    {id:"fade",      note:"plain crossfade, 500 ms each way"},
+    {id:"slide",     note:"rises 22 px into place"},
+    {id:"reveal",    note:"words lit as they commit"},
+    {id:"pulse",     note:"arrives provisional, brightens on commit"},
+    {id:"uncertain", note:"one low-confidence word dimmed and dotted"},
+    {id:"glow",      note:"soft halo on arrival, decays"},
+    {id:"age",       note:"dims over 6 s of silence, then clears"}
+  ];
+  var i = 1, kaBright = 75, busy = false, fx = 0, ageTimer = null, clearTimer = null;
   var block = document.getElementById("block"), en = document.getElementById("en"),
       ka = document.getElementById("ka"), stage = document.getElementById("stage"),
       hud = document.getElementById("hud");
 
   function paint(){
-    en.textContent = UTTS[i].e;
+    var words = UTTS[i].e.split(" ");
+    var doubt = EFFECTS[fx].id === "uncertain" ? Math.floor(Math.random() * words.length) : -1;
+    var reveal = EFFECTS[fx].id === "reveal";
+    en.innerHTML = words.map(function(w, n){
+      var cls = (reveal ? "w" : "") + (n === doubt ? " doubt" : "");
+      return '<span class="' + cls.trim() + '">' + w + '</span>';
+    }).join(" ");
     ka.textContent = UTTS[i].k;
     ka.style.color = "rgba(255,255,255," + (kaBright/100).toFixed(2) + ")";
   }
-  // Replace, never reflow: the block fades out, the text is swapped while invisible, and it
-  // fades back in. Lines already on the lens are never re-wrapped in front of the wearer.
+  function resetState(){
+    clearTimeout(ageTimer); clearTimeout(clearTimer);
+    block.className = "";
+  }
+  // Replace, never reflow. The next line is laid out while invisible; nothing on the lens re-wraps.
   function show(next){
     if (busy) return; busy = true;
-    block.classList.add("out");
-    setTimeout(function(){ i = (next + UTTS.length) % UTTS.length; paint();
-                           block.classList.remove("out"); busy = false; }, 500);
+    var id = EFFECTS[fx].id;
+    resetState();
+    block.classList.add("out"); if (id === "slide") block.classList.add("slide");
+    setTimeout(function(){
+      i = (next + UTTS.length) % UTTS.length; paint();
+      if (id === "pulse") block.classList.add("provisional");
+      if (id === "glow")  block.classList.add("arrive");
+      block.classList.remove("out");
+      setTimeout(function(){ block.classList.remove("slide"); }, 520);
+      if (id === "reveal") {
+        var ws = en.querySelectorAll(".w");
+        ws.forEach(function(w, n){ setTimeout(function(){ w.classList.add("on"); }, 90 + n * 110); });
+      }
+      if (id === "pulse") {
+        setTimeout(function(){ block.classList.remove("provisional"); block.classList.add("arrive");
+                               setTimeout(function(){ block.classList.remove("arrive"); }, 260); }, 700);
+      }
+      if (id === "glow") setTimeout(function(){ block.classList.remove("arrive"); }, 120);
+      if (id === "age") {
+        ageTimer   = setTimeout(function(){ block.classList.add("aging"); block.classList.add("aged"); }, 800);
+        clearTimer = setTimeout(function(){ block.classList.add("out"); }, 7200);
+      }
+      busy = false;
+    }, 500);
   }
   var hudTimer = null;
   function flash(msg){
     hud.textContent = msg; hud.classList.add("show");
-    clearTimeout(hudTimer); hudTimer = setTimeout(function(){ hud.classList.remove("show"); }, 900);
+    clearTimeout(hudTimer); hudTimer = setTimeout(function(){ hud.classList.remove("show"); }, 1400);
   }
-  // Thumb swipe / pinch arrive as arrow keys and Enter (Meta's Web Apps input model).
-  //   Right, Enter -> next utterance      Left -> previous
-  //   Up / Down    -> Georgian brightness +/- 5 %, a first-light readability probe
   document.addEventListener("keydown", function(e){
     switch (e.key) {
       case "ArrowRight": show(i + 1); break;
-      case "Enter":      setPlate(plateIdx + 1); flash("plate: " + PLATES[plateIdx]); break;
-      case "ArrowLeft":                show(i - 1); break;
-      case "ArrowUp":   kaBright = Math.min(100, kaBright + 5); paint(); flash("Georgian " + kaBright + "%"); break;
-      case "ArrowDown": kaBright = Math.max(20,  kaBright - 5); paint(); flash("Georgian " + kaBright + "%"); break;
+      case "ArrowLeft":  show(i - 1); break;
+      case "Enter":      fx = (fx + 1) % EFFECTS.length; flash(EFFECTS[fx].id + " — " + EFFECTS[fx].note); break;
+      case "ArrowUp":    kaBright = Math.min(100, kaBright + 5); paint(); flash("Georgian " + kaBright + "%"); break;
+      case "ArrowDown":  kaBright = Math.max(20,  kaBright - 5); paint(); flash("Georgian " + kaBright + "%"); break;
       default: return;
     }
     e.preventDefault();
   });
-  setPlate(0);
   paint();
   stage.focus();
 </script>
