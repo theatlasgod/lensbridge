@@ -8,7 +8,7 @@
 <title>LensBridge</title>
 <link rel="icon" href="data:,">
 <style>
-  /* LensBridge 0.4.0 (glasses-68): effects showcase; plate fixed at vfade 90->35 %
+  /* LensBridge 0.4.1 (glasses-69): outlined bubble; slide retired; up/down switch plate
      rendered by the glasses' own browser. Nothing here is a simulation: what this draws is what
      the waveguide emits. Black is transparent. */
   @font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;font-display:block;
@@ -37,19 +37,28 @@
 
   /* The plate wraps the English ONLY. Radius 15, padding 17/13, hugs its longest line.
      Treatment fixed at Chad's vertical fade, 90 % at the top to 35 % at the bottom (glasses-68). */
-  #plate{border-radius:15px;padding:13px 17px;max-width:100%;
-         background:linear-gradient(to bottom, rgba(255,255,255,.90) 0%, rgba(255,255,255,.35) 100%);
+  #plate{border-radius:15px;padding:13px 17px;max-width:100%;box-sizing:border-box;
          transition:box-shadow 600ms ease-out, opacity 300ms linear;}
+  body[data-plate="vfade"] #plate{
+         background:linear-gradient(to bottom, rgba(255,255,255,.90) 0%, rgba(255,255,255,.35) 100%);}
+  /* Chad's outlined bubble (glasses-69): 50 % fill, a black INNER glow -- which on an additive
+     display means the interior dims toward transparent at its edges -- and a 90 % 3 px stroke that
+     keeps the shape crisp while the fill emits half the light. */
+  body[data-plate="outline"] #plate{
+         background:rgba(255,255,255,.50);
+         border:3px solid rgba(255,255,255,.90);
+         box-shadow:inset 0 0 18px 4px rgba(0,0,0,1);}
+  body[data-plate="solid"] #plate{background:#fff;}
   #en{font-family:"Source Sans 3",system-ui,sans-serif;font-weight:700;font-size:36px;
       line-height:1.22;color:#000;letter-spacing:-.012em;}
 
   /* ---- Effects showcase (glasses-68). Each carries information a live caption needs. ---- */
-  #block.out.slide{transform:translateY(22px);}
   #en .w{opacity:0;transition:opacity 180ms linear;}
   #en .w.on{opacity:1;}
   #block.provisional #plate{opacity:.55;}
   #en .doubt{opacity:.55;text-decoration:underline dotted;text-underline-offset:5px;text-decoration-thickness:2px;}
   #block.arrive #plate{box-shadow:0 0 26px 8px rgba(255,255,255,.42);}
+  body[data-plate="outline"] #block.arrive #plate{box-shadow:inset 0 0 18px 4px rgba(0,0,0,1), 0 0 26px 8px rgba(255,255,255,.42);}
   #block.aging{transition:opacity 6000ms linear;}
   #block.aged{opacity:.38;}
 
@@ -67,7 +76,7 @@
 </style>
 </head>
 <body>
-  <div id="tag">LensBridge 0.4.0</div>
+  <div id="tag">LensBridge 0.4.1</div>
   <div id="hud"></div>
   <div id="stage" class="focusable" tabindex="0" role="application" aria-label="LensBridge">
     <div id="block">
@@ -86,7 +95,6 @@
   // Pinch cycles these. Every one answers a real caption question, not a cosmetic one.
   var EFFECTS = [
     {id:"fade",      note:"plain crossfade, 500 ms each way"},
-    {id:"slide",     note:"rises 22 px into place"},
     {id:"reveal",    note:"words lit as they commit"},
     {id:"pulse",     note:"arrives provisional, brightens on commit"},
     {id:"uncertain", note:"one low-confidence word dimmed and dotted"},
@@ -94,6 +102,9 @@
     {id:"age",       note:"dims over 6 s of silence, then clears"}
   ];
   var i = 1, kaBright = 75, busy = false, fx = 0, ageTimer = null, clearTimer = null;
+  var PLATES = ["outline","vfade","solid"], plateIdx = 0;
+  function setPlate(n){ plateIdx = (n + PLATES.length) % PLATES.length;
+                        document.body.dataset.plate = PLATES[plateIdx]; flash("plate: " + PLATES[plateIdx]); }
   var block = document.getElementById("block"), en = document.getElementById("en"),
       ka = document.getElementById("ka"), stage = document.getElementById("stage"),
       hud = document.getElementById("hud");
@@ -118,13 +129,12 @@
     if (busy) return; busy = true;
     var id = EFFECTS[fx].id;
     resetState();
-    block.classList.add("out"); if (id === "slide") block.classList.add("slide");
+    block.classList.add("out");
     setTimeout(function(){
       i = (next + UTTS.length) % UTTS.length; paint();
       if (id === "pulse") block.classList.add("provisional");
       if (id === "glow")  block.classList.add("arrive");
       block.classList.remove("out");
-      setTimeout(function(){ block.classList.remove("slide"); }, 520);
       if (id === "reveal") {
         var ws = en.querySelectorAll(".w");
         ws.forEach(function(w, n){ setTimeout(function(){ w.classList.add("on"); }, 90 + n * 110); });
@@ -151,12 +161,13 @@
       case "ArrowRight": show(i + 1); break;
       case "ArrowLeft":  show(i - 1); break;
       case "Enter":      fx = (fx + 1) % EFFECTS.length; flash(EFFECTS[fx].id + " — " + EFFECTS[fx].note); break;
-      case "ArrowUp":    kaBright = Math.min(100, kaBright + 5); paint(); flash("Georgian " + kaBright + "%"); break;
-      case "ArrowDown":  kaBright = Math.max(20,  kaBright - 5); paint(); flash("Georgian " + kaBright + "%"); break;
+      case "ArrowUp":    setPlate(plateIdx + 1); break;
+      case "ArrowDown":  setPlate(plateIdx - 1); break;
       default: return;
     }
     e.preventDefault();
   });
+  document.body.dataset.plate = PLATES[0];
   paint();
   stage.focus();
 </script>
