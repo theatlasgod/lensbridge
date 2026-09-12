@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="mrbd-web-app-capable" content="yes">
+<meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no">
+<title>LensProbe</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;color:#fff}
+  body{width:600px;height:600px;overflow:hidden;font-family:monospace;font-size:19px;line-height:1.25}
+  #out{position:absolute;left:30px;top:26px;right:30px;bottom:26px;white-space:pre-wrap;word-break:break-all;outline:none}
+  #out:focus{outline:none}
+  .ok{color:#9f9}.bad{color:#f88}.dim{color:#aaa}
+  #bar{position:absolute;left:30px;bottom:6px;font-size:15px;color:#888}
+  #box{position:absolute;left:-1000px;top:0;width:40px;height:40px;background:#111;transition:height 1000ms linear}
+  #box.grow{height:240px}
+  #mv{position:absolute;left:-1000px;top:0;width:40px;height:40px;background:#111;transition:transform 1000ms linear}
+  #mv.go{transform:translateY(-200px)}
+</style>
+</head>
+<body>
+<div id="out" tabindex="0"></div>
+<div id="box"></div><div id="mv"></div>
+<div id="bar">LensProbe 0.1.1 · Enter = rerun · ←/→ = page · alive <span id="alive">0</span> s</div>
+<script>
+// LensProbe: what does the Ray-Ban Display's web runtime actually support? (glasses-74)
+// Every line is a measurement on the device; nothing here is inferred from docs.
+var LINES = [], PAGE = 0, PER = 20, out = document.getElementById('out');
+function line(s, cls){ LINES.push([s, cls || '']); render(); }
+function set(i, s, cls){ LINES[i] = [s, cls || '']; render(); }
+function render(){
+  var start = PAGE * PER, html = '';
+  for (var i = start; i < Math.min(LINES.length, start + PER); i++)
+    html += '<span class="' + LINES[i][1] + '">' + esc(LINES[i][0]) + '</span>\n';
+  out.innerHTML = html;
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function has(name, v){ line((v ? 'yes ' : 'NO  ') + name, v ? 'ok' : 'bad'); }
+var T0 = performance.now();
+function now(){ return Math.round(performance.now() - T0); }
+
+// -- lifecycle: does the page keep running when the display sleeps / the wearer looks away? --------
+var alive = 0, lastHidden = -1, hiddenAt = 0, gaps = 0, lastTick = performance.now();
+setInterval(function(){
+  alive++; document.getElementById('alive').textContent = alive;
+  var t = performance.now(); if (t - lastTick > 2500) gaps++; lastTick = t;   // a 1 s timer that skipped > 2.5 s
+}, 1000);
+var vis = [];
+document.addEventListener('visibilitychange', function(){ vis.push(document.visibilityState + '@' + now()); saveVis(); });
+window.addEventListener('blur', function(){ vis.push('blur@' + now()); saveVis(); });
+window.addEventListener('focus', function(){ vis.push('focus@' + now()); saveVis(); });
+window.addEventListener('pagehide', function(){ vis.push('pagehide@' + now()); saveVis(); });
+function saveVis(){ try { localStorage.setItem('probe_vis', vis.slice(-6).join(' ')); } catch(e){} }
+
+function run(){
+  LINES = []; PAGE = 0;
+  var ua = navigator.userAgent || '';
+  line('UA ' + ua.slice(0, 110), 'dim');
+  line('win ' + innerWidth + 'x' + innerHeight + ' dpr ' + devicePixelRatio + ' screen ' + screen.width + 'x' + screen.height +
+       ' online=' + navigator.onLine + ' mem=' + (navigator.deviceMemory || '?') + 'GB cores=' + (navigator.hardwareConcurrency || '?'), 'dim');
+  var prev = ''; try { prev = localStorage.getItem('probe_last') || ''; } catch(e){ prev = 'storage error'; }
+  line('storage: previous run ' + (prev ? prev : '(none)') + '  vis ' + (function(){ try { return localStorage.getItem('probe_vis') || '-'; } catch(e){ return '-'; } })(), 'dim');
+  try { localStorage.setItem('probe_last', new Date().toISOString().slice(0, 19)); } catch(e){}
+  has('WebSocket', typeof WebSocket !== 'undefined');
+  has('EventSource', typeof EventSource !== 'undefined');
+  has('fetch+streams', typeof fetch !== 'undefined' && typeof ReadableStream !== 'undefined');
+  has('ResizeObserver', typeof ResizeObserver !== 'undefined');
+  has('Element.animate (WAAPI)', typeof Element.prototype.animate === 'function');
+  has('Intl.Segmenter', typeof Intl !== 'undefined' && typeof Intl.Segmenter !== 'undefined');
+  has('navigator.wakeLock (Herald uses it)', !!(navigator.wakeLock && navigator.wakeLock.request));
+
+  // -- frame rate --------------------------------------------------------------------------------
+  var iRaf = LINES.length; line('rAF: measuring...');
+  var frames = 0, t0 = performance.now(), rafDone = false;
+  function tick(){ frames++; if (performance.now() - t0 < 2000) requestAnimationFrame(tick); else if (!rafDone) {
+    rafDone = true; var fps = frames / ((performance.now() - t0) / 1000);
+    set(iRaf, 'rAF ' + fps.toFixed(1) + ' fps over 2 s (' + frames + ' frames)', fps > 20 ? 'ok' : 'bad');
+    cssTests();
+  } }
+  requestAnimationFrame(tick);
+  setTimeout(function(){ if (!rafDone) { rafDone = true; set(iRaf, 'rAF STALLED: ' + frames + ' frames in 3.5 s (throttled or hidden)', 'bad'); cssTests(); } }, 3500);
+
+  // -- CSS transitions: height growth and transform travel, frames counted while they run ----------
+  function cssTests(){
+    var iH = LINES.length; line('height transition: running...');
+    var box = document.getElementById('box'), n = 0, s = performance.now(), running = true;
+    function cnt(){ n++; if (running) requestAnimationFrame(cnt); }
+    requestAnimationFrame(cnt);
+    var hDone = false;
+    setTimeout(function(){ if (!hDone) { hDone = true; running = false; set(iH, 'height transition: no transitionend in 3 s (' + n + ' frames)', 'bad'); box.className = ''; netTests(); } }, 3000);
+    box.addEventListener('transitionend', function te(){
+      if (hDone) return; hDone = true;
+      running = false; box.removeEventListener('transitionend', te);
+      set(iH, 'height 40->240 px in ' + Math.round(performance.now() - s) + ' ms, ' + n + ' frames', n > 20 ? 'ok' : 'bad');
+      box.className = '';
+      var iM = LINES.length; line('transform transition: running...');
+      var mv = document.getElementById('mv'), m = 0, s2 = performance.now(), r2 = true;
+      function c2(){ m++; if (r2) requestAnimationFrame(c2); }
+      requestAnimationFrame(c2);
+      var mDone = false;
+      setTimeout(function(){ if (!mDone) { mDone = true; r2 = false; set(iM, 'transform transition: no transitionend in 3 s (' + m + ' frames)', 'bad'); mv.className = ''; netTests(); } }, 3000);
+      mv.addEventListener('transitionend', function te2(){
+        if (mDone) return; mDone = true;
+        r2 = false; mv.removeEventListener('transitionend', te2);
+        set(iM, 'translateY 200 px in ' + Math.round(performance.now() - s2) + ' ms, ' + m + ' frames', m > 20 ? 'ok' : 'bad');
+        mv.className = '';
+        netTests();
+      });
+      requestAnimationFrame(function(){ mv.className = 'go'; });
+    });
+    requestAnimationFrame(function(){ box.className = 'grow'; });
+  }
+
+  // -- network: how far is the internet from the lens? -----------------------------------------------
+  function netTests(){
+    var iF = LINES.length; line('fetch RTT: measuring...');
+    var rtts = [], k = 0;
+    function one(){
+      var s = performance.now();
+      fetch('ping.txt?t=' + Date.now() + '_' + k, {cache: 'no-store'}).then(function(r){ return r.text(); }).then(function(){
+        rtts.push(Math.round(performance.now() - s)); k++;
+        if (k < 5) one(); else {
+          var sorted = rtts.slice().sort(function(a,b){return a-b;});
+          set(iF, 'fetch RTT ms min ' + sorted[0] + ' med ' + sorted[2] + ' max ' + sorted[4] + '  [' + rtts.join(' ') + ']', 'ok');
+          wsTest();
+        }
+      }).catch(function(e){ set(iF, 'fetch FAILED ' + e, 'bad'); wsTest(); });
+    }
+    one();
+  }
+  function wsTest(){
+    var iW = LINES.length; line('WebSocket: connecting...');
+    if (typeof WebSocket === 'undefined') { set(iW, 'WebSocket absent', 'bad'); sseTest(); return; }
+    var urls = ['wss://echo.websocket.org', 'wss://ws.postman-echo.com/raw'], ui = 0;
+    function tryUrl(){
+      if (ui >= urls.length) { set(iW, 'WebSocket: no echo server reachable', 'bad'); sseTest(); return; }
+      var url = urls[ui++], s = performance.now(), ws, done = false, sent = 0, rtts = [], sentAt = 0;
+      var timer = setTimeout(function(){ if (!done) { done = true; try { ws.close(); } catch(e){} tryUrl(); } }, 8000);
+      try { ws = new WebSocket(url); } catch(e){ clearTimeout(timer); tryUrl(); return; }
+      ws.onopen = function(){
+        var conn = Math.round(performance.now() - s);
+        set(iW, 'WS open ' + conn + ' ms ' + url.replace('wss://','') + ' echo...');
+        setTimeout(function(){ sentAt = performance.now(); ws.send('p' + sent); }, 600);   // let any greeting arrive first
+        ws.onmessage = function(ev){
+          if (String(ev.data).indexOf('p' + sent) !== 0) return;             // ignore greetings
+          rtts.push(Math.round(performance.now() - sentAt)); sent++;
+          if (sent < 5) { sentAt = performance.now(); ws.send('p' + sent); }
+          else { done = true; clearTimeout(timer); ws.close();
+            var so = rtts.slice().sort(function(a,b){return a-b;});
+            set(iW, 'WS open ' + conn + ' ms, echo RTT ms min ' + so[0] + ' med ' + so[2] + ' max ' + so[4] + ' (' + url.replace('wss://','') + ')', 'ok');
+            sseTest(); }
+        };
+      };
+      ws.onerror = function(){ if (!done) { done = true; clearTimeout(timer); tryUrl(); } };
+    }
+    tryUrl();
+  }
+  function sseTest(){
+    var iS = LINES.length; line('SSE: connecting...');
+    if (typeof EventSource === 'undefined') { set(iS, 'EventSource absent', 'bad'); finish(); return; }
+    var s = performance.now(), es, got = 0, done = false;
+    var timer = setTimeout(function(){ if (!done) { done = true; try { es.close(); } catch(e){} set(iS, 'SSE: no event within 8 s (wikimedia)', 'bad'); finish(); } }, 8000);
+    try { es = new EventSource('https://stream.wikimedia.org/v2/stream/recentchange'); } catch(e){ clearTimeout(timer); set(iS, 'SSE ctor failed', 'bad'); finish(); return; }
+    var first = 0;
+    es.onmessage = function(){ got++; if (got === 1) first = Math.round(performance.now() - s);
+      if (got >= 2 && !done) { done = true; clearTimeout(timer); es.close(); set(iS, 'SSE first event ' + first + ' ms, 2nd at ' + Math.round(performance.now() - s) + ' ms (wikimedia)', 'ok'); finish(); } };
+    es.onerror = function(){ if (!done) { done = true; clearTimeout(timer); es.close(); set(iS, 'SSE error (wikimedia)', 'bad'); finish(); } };
+  }
+  function finish(){
+    line('timer gaps >2.5 s so far: ' + gaps + '  (look away / let the display sleep, then check)', 'dim');
+    line('done in ' + now() + ' ms', 'dim');
+  }
+}
+
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { run(); e.preventDefault(); }
+  else if (e.key === 'ArrowRight') { if ((PAGE + 1) * PER < LINES.length) PAGE++; render(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { if (PAGE > 0) PAGE--; render(); e.preventDefault(); }
+});
+out.focus();
+run();
+</script>
+</body>
+</html>
